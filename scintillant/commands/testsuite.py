@@ -6,6 +6,8 @@ Commands for activating the test environment
 import sys
 import os
 import json
+import time
+from http import HTTPStatus
 from zipfile import ZipFile
 import multiprocessing
 from livereload import Server
@@ -13,6 +15,8 @@ import click
 import requests
 
 from scintillant import addons_versions
+from scintillant.apimodels import User, Client, SkillResponse, SkillRequest, Message
+from scintillant.commands.utils import get_config
 
 
 def create_snlt():
@@ -31,7 +35,9 @@ def create_snlt():
             "testsuite": {
                 "version": addons_versions['__testsuite__'],
                 "path": path,
-                "theme": "dark"
+                "theme": "dark",
+                "api_host": "localhost",
+                "api_port": "8080"
             }
         }, snlt, sort_keys=True, indent=4)
 
@@ -82,38 +88,87 @@ def get_current_app(app_path: str = None):
         )
 
 
-def start_bot_server():
+def start_bot_server(host: str = 'localhost', port: str = '8080'):
     app = get_current_app()
     click.echo("Starting application server...")
     try:
-        app(port=8080)
+        app(host=host, port=port)
     except Exception as exc:
         click.echo(exc)
 
 
+def initial_test_shell(skill_url: str) -> None:
+    client: Client = Client(name='testshell')
+    user: User = User(idx=0, username='Scintillant', client=client)
+    text: str = "!start"
+    context: dict = {}
+    while True:
+        if text in ['!quit', '!exit', '!stop']:
+            break
+        data = SkillRequest(
+            message=Message(user=user, text=text),
+            context=context
+        ).dict()
+        request = requests.post(skill_url + '/skill', json=data).json()
+        response = SkillResponse(**request)
+        context = response.context
+        if response.status == HTTPStatus.RESET_CONTENT:
+            click.echo("End of operating...")
+            break
+        if response.status != HTTPStatus.OK:
+            click.echo("End of operating with exception!")
+            break
+
+        click.echo(f"{response.status}: {response.text}")
+        text = str(click.prompt('', type=str))
+
+
+def start_test_shell():
+    js = get_config()
+
+    if not js:
+        create_snlt()
+        start_test_shell()
+    if 'testsuite' not in js:
+        update_snlt()
+        start_test_shell()
+    # Serving current backend application
+    click.echo("Creating server process...")
+    _process = multiprocessing.Process(target=start_bot_server, args=(
+        js['testsuite'].get('api_host', 'localhost'), js['testsuite'].get('api_port', '8080')
+    ))
+    _process.start()
+    # Starting Shell for testing bot
+    click.echo("Starting testshell inputs...")
+    time.sleep(3)
+    initial_test_shell(js['skill_working_url'])
+    _process.terminate()
+    _process.join()
+
+
 def start_test_suite():
-    if os.path.exists(os.getcwd() + '/.snlt'):
-        js = json.load(
-            open(os.getcwd() + '/.snlt')
-        )
-        if 'testsuite' not in js or 'path' not in js['testsuite']:
-            update_snlt()
-            return start_test_suite()
-        else:
-            test_suite_path = js['testsuite']['path']
-            install_suite(test_suite_path)
-    else:
+    js = get_config()
+    if not js:
         create_snlt()
         return start_test_suite()
+    if 'testsuite' not in js or 'path' not in js['testsuite']:
+        update_snlt()
+        return start_test_suite()
+    else:
+        test_suite_path = js['testsuite']['path']
+        install_suite(test_suite_path)
 
     if not os.path.exists(test_suite_path):
         install_suite(test_suite_path)
         return start_test_suite()
 
+    # Serving current backend application
     click.echo("Creates processes...")
-    _process = multiprocessing.Process(target=start_bot_server, args=())
+    _process = multiprocessing.Process(target=start_bot_server, args=(
+        js['testsuite'].get('api_host', 'localhost'), js['testsuite'].get('api_port', '8080')
+    ))
     _process.start()
-
+    # Serving testsuite frontend application
     click.echo("starting testsuite...")
     server = Server()
     server.serve(root=test_suite_path, default_filename='index.html')

@@ -10,7 +10,18 @@ import json
 from scintillant import addons_versions
 
 
+def get_config():
+    """ Uploading config data or returns None
+    """
+    js = None  # CONFIGURATION DICT
+    if os.path.exists(os.getcwd() + '/.snlt'):
+        js = json.load(open(os.getcwd() + '/.snlt'))
+    return js
+
+
 def show_testsuite_version():
+    """ Check and show version of installed testsuite
+    """
     if not os.path.exists(os.getcwd() + '/.snlt'): return
     snlt = json.load(open(os.getcwd() + '/.snlt'))
     if 'testsuite' not in snlt: return

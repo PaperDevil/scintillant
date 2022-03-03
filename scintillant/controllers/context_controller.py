@@ -1,23 +1,17 @@
+from http import HTTPStatus
 from typing import Callable
-from scintillant.apimodels import SkillResponse
-from scintillant.apimodels.types import SkillRequestType, SkillResponseType
-from scintillant.outs import Dictionary
+from scintillant.apimodels.types import SkillRequest, SkillResponse
 
 
 class ContextUpdater:
     states = {}  # state_name: state_func
-    exit_phrases = ['exit', 'выход', 'хватит', 'остановись']
+    exit_phrases = ['exit', 'quit', 'end']
 
-    def __init__(self, data: SkillRequestType, dictionary: Dictionary):
+    def __init__(self, data: SkillRequest):
         # Default parameters for find state and complete it
         self.data = data
         self.context = data.context
-        self.response = SkillResponse(status='ok')
-
-        if data.user.client.type.lower() == 'voice':
-            self.dictionary = dictionary.voice()
-        else:
-            self.dictionary = dictionary.text()
+        self.response = SkillResponse(status=HTTPStatus.OK)
 
     @property
     def next_state(self):
@@ -32,8 +26,7 @@ class ContextUpdater:
 
     def execute_state(self):
         # Termination of the skill if the user has asked for it
-        if (self.data.update.in_text in self.exit_phrases
-                or self.data.update.in_choice in self.exit_phrases):
+        if self.data.message.text in self.exit_phrases:
             self.response.status = 'exit'
         # In case the user has just entered the skill,
         # we call the _initial_state_ function.
@@ -47,18 +40,19 @@ class ContextUpdater:
             else:
                 self.states[state](self)
 
-    def get_response(self) -> SkillResponseType:
+    def get_response(self) -> SkillResponse:
         self.execute_state()
         self.response.context = self.context
         return self.response
 
     def _initial_state_(self):
         """Execute when state is None"""
-        self.response.out_text = "Добро пожаловать в фреймворк Scintillant." \
-                                 "\n\n" \
-                                 "Вы сгенерировали ваш первый шаблон навыка " \
-                                 "и видите это сообщение потому, что не " \
-                                 "изменили ответ для шага `_initial_state_`!"
+        self.response.text = (
+            "Welcome to Scintillant v2.0! \n"
+            "This message generated from default scintillant initial state. "
+            "Create your own _initial_state_ function on context controller to "
+            "override it."
+        )
 
     @classmethod
     def statefunc(cls, func):

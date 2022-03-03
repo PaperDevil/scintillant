@@ -19,15 +19,13 @@ setup(
     packages=[
         'scintillant',
         'scintillant.apimodels',
-        'scintillant.apimodels.models',
-        'scintillant.apimodels.db',
         'scintillant.controllers',
         'scintillant.commands',
-        'scintillant.outs'
+        'scintillant.textutils'
     ],
     include_package_data=True,
-    python_requires=">=3.8.*",
-    install_requires=['tqdm', 'requests', 'livereload', 'Click'],
+    python_requires=">=3.9.*,>=3.10.*",
+    install_requires=['tqdm', 'requests', 'livereload', 'Click', 'pydantic'],
     license=about['__license__'],
     zip_safe=False,
     entry_points={

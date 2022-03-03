@@ -1,76 +1,56 @@
+import typing
+from datetime import datetime
 from http import HTTPStatus
+from pydantic import BaseModel, Field
 
 
-class SkillResponseType:
-    status: str
-    out_text: str or None
-    choices: list or None
-    attach: None
-    client_app_action: str or None
-    request_field_code: str or None
-    context: dict or None
-    redirect_to: str or None
+class MessageText(str):
+    def contains(self, text: str, case_sens=False) -> bool:
+        if not case_sens:
+            result = text.lower() in self.lower()
+        else:
+            result = text in self
+        return result
 
-    @classmethod
-    async def from_json_response(cls, response: dict): ...
-
-    @classmethod
-    async def from_response(cls, response): ...
-
-    def serialize_json(self) -> dict: ...
+    def contains_any(self, texts: list, case_sens=False) -> bool:
+        for text in texts:
+            if self.contains(text, case_sens):
+                return True
+        return False
 
 
-class SkillRequestType:
-    class User:
-
-        class Client:
-            name: str
-            type: str
-            _meta_: dict
-
-        user_id: str
-        client: Client
-        global_id: str
-
-    class Update:
-        in_text: str
-        in_choice: str
-        datetime: int
-
-    user: User
-    update: Update
-    context: dict
-
-    def serialize_json(self) -> dict: ...
-
-    @classmethod
-    async def from_dict(cls, request): ...
+class Client(BaseModel):
+    name: str = Field(...)
 
 
-class ClientResponseType:
-    out_text: str
-    status_code: HTTPStatus or int
-    choices: list or None
-    client_app_action: str or None
-    requested_field_code: str or None
-
-    @classmethod
-    def from_dict(cls, data: dict): ...
-
-    @classmethod
-    def from_skill_response(cls, response: SkillResponseType): ...
-
-    def serialize_json(self) -> dict: ...
+class User(BaseModel):
+    idx: typing.Union[int, str] = Field(..., example='1')
+    username: typing.Optional[str] = Field(None, example='ketovx')
+    client: typing.Optional[Client]
 
 
-class DialogAnswerRequestType:
-    client_id: str
-    client_app: str
-    client_type: str
-    in_text: str or None
-    in_choice: str or None
+class Message(BaseModel):
+    user: User = Field(...)
+    text: MessageText = Field(...)
+    binaries: typing.Optional[str] = Field(None)
+    timestamp: typing.Union[float, int] = Field(default=datetime.now().timestamp())
 
-    @classmethod
-    async def from_dict(cls, request): ...
+    def __init__(self, *args, **kwargs):
+        kwargs['text'] = MessageText(kwargs['text'])
+        super().__init__(*args, **kwargs)
 
-    def serialize_json(self) -> dict: ...
+
+class SkillResponse(BaseModel):
+    """ Response Model for testsuite
+    """
+    status: HTTPStatus = Field(..., example=HTTPStatus.OK)
+    text: typing.Optional[str] = Field(None, example='Any text...')
+    binaries: typing.Optional[str] = Field(None)
+    context: typing.Optional[dict] = Field(None)
+
+
+class SkillRequest(BaseModel):
+    """ Request model for testsuite
+    """
+    message: Message
+    context: dict = Field({})

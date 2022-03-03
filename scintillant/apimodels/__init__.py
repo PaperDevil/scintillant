@@ -1,5 +1,6 @@
-from scintillant.apimodels.models import (
-    ClientResponse, SkillRequest, SkillResponse, DialogAnswerRequest
+from scintillant.apimodels import types
+from scintillant.apimodels.types import (
+    Client, User, Message, SkillRequest, SkillResponse
 )
 
-version = '0.5.5'
+version = '0.5.6'
